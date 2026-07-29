@@ -301,7 +301,10 @@ def search(req: SearchRequest) -> SearchResponse:
         raise HTTPException(status_code=404, detail="Collection is empty — POST /ingest first.")
     top_k = req.top_k or settings.top_k
     qvec = _embed([req.query])[0]
-    hits = store.search(qvec, top_k)
+    
+    threshold = getattr(settings, "score_threshold", 0.25)
+    hits = store.search(qvec, top_k, score_threshold=threshold)
+    
     return SearchResponse(
         query=req.query, top_k=top_k, embedding_model=_embedder().describe(),
         query_embedding_preview=[round(x, 5) for x in qvec[:8]],

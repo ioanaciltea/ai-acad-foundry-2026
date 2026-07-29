@@ -51,8 +51,9 @@ class VectorStore:
 
     # --- data ----------------------------------------------------------------
     def upsert(self, chunks: list[str], vectors: list[list[float]], strategy: str,
-               source: str | None) -> list[str]:
-        ids = [str(uuid.uuid4()) for _ in chunks]
+                source: str | None) -> list[str]:
+        src = source or "adhoc"
+        ids = [str(uuid.uuid5(uuid.NAMESPACE_URL, f"{src}-chunk-{i}")) for i in range(len(chunks))]
         now = datetime.now(timezone.utc).isoformat(timespec="seconds")
         self.client.upsert(
             collection_name=self.collection,
@@ -64,7 +65,7 @@ class VectorStore:
                         "text": text,
                         "index": i,
                         "strategy": strategy,
-                        "source": source or "adhoc",
+                        "source": src,
                         "ingested_at": now,
                     },
                 )
@@ -73,9 +74,13 @@ class VectorStore:
         )
         return ids
 
-    def search(self, vector: list[float], top_k: int) -> list[dict]:
+    def search(self, vector: list[float], top_k: int, score_threshold: float | None = None) -> list[dict]:
         hits = self.client.query_points(
-            collection_name=self.collection, query=vector, limit=top_k, with_payload=True
+            collection_name=self.collection,
+            query=vector,
+            limit=top_k,
+            with_payload=True,
+            score_threshold=  0.55 #score_threshold, 
         ).points
         return [
             {
@@ -88,6 +93,8 @@ class VectorStore:
             }
             for h in hits
         ]
+
+    
 
     # --- introspection --------------------------------------------------------
     def info(self) -> dict:
