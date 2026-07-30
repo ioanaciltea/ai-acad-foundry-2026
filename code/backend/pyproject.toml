@@ -13,11 +13,14 @@ dependencies = [
     "azure-ai-inference>=1.0.0b9",
     "azure-ai-projects>=1.0.0",
     "azure-identity>=1.17",
+    "azure-cognitiveservices-speech>=1.35.0",
     "httpx>=0.27",
     "python-multipart>=0.0.9",
     "tiktoken>=0.7",
 ]
-
+ 
 [tool.uv]
 # This is an application, not an installable package — sync dependencies only.
 package = false
+ 
+ 

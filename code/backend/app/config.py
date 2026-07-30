@@ -47,10 +47,13 @@ class Settings(BaseSettings):
     fact_check_pages: int = 3                # how many results to actually read
 
     # --- Azure AI Speech (falls back to the Foundry resource when unset) -------
+    azure_speech_endpoint: str = ""
+    azure_speech_resource_id: str = ""
     azure_speech_key: str = ""
     azure_speech_region: str = ""           # e.g. swedencentral
     azure_speech_voice: str = "en-US-AvaMultilingualNeural"
     azure_speech_language: str = "en-US"
+ 
 
     # --- environment coordinates (used by scripts/, not by the app itself) ----
     azure_resource_group: str = ""

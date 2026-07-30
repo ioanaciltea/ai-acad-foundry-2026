@@ -1,7 +1,10 @@
 """Provider-agnostic embeddings: lmstudio | openai | azure.
 
-Anthropic is deliberately absent — it offers no embeddings API; use any of the
-other three for vectors even when Claude answers the chat side.
+Configured for bilingual semantic vector space (English & Romanian):
+- OpenAI & Azure: text-embedding-3-small / text-embedding-3-large (multilingual dense vector mapping)
+- LM Studio: text-embedding-nomic-embed-text-v1.5 / bge-m3 / multilingual-e5
+
+Enables cross-lingual retrieval: Romanian queries accurately match English documents and vice versa.
 """
 from __future__ import annotations
 

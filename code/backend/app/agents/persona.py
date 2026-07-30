@@ -41,10 +41,20 @@ class Persona:
             rules = "\n".join(f"- {r}" for r in self.style_rules)
             parts.append(f"Style rules you must follow:\n{rules}")
 
+        language_rule = (
+            "STRICT NATIVE ROMANIAN LANGUAGE & PHONETICS ENFORCEMENT (CRITICAL): You are required to communicate, "
+            "respond, and speak EXCLUSIVELY in native Romanian. Under no circumstances mix English phonetics, "
+            "broken accents, or spelling rules. All responses must use correct Romanian grammar, natural phrasing, "
+            "diacritics where appropriate (ă, â, î, ș, ț), and correct native pronunciation."
+        )
+        parts.append(language_rule)
+
         if grounded:
             grounding = [
-                "You are given CONTEXT passages retrieved from the bank's own documents.",
+                "You are given CONTEXT passages retrieved from the bank's own documents (in English or Romanian).",
                 "Base your answer on those passages.",
+                "Bilingual Context Processing: Accurately process and match information from retrieved documents "
+                "regardless of whether the query and documents are in English or Romanian, and answer fluently in the user's prompt language.",
             ]
             if self.require_citations:
                 grounding.append("Cite the passages you use as [1], [2], … .")

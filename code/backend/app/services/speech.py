@@ -1,19 +1,10 @@
-"""Azure AI Speech — text-to-speech and speech-to-text, over plain REST.
-
-We deliberately call the REST API with httpx instead of installing the Speech SDK.
-Two reasons, both pedagogical: it keeps the dependency list honest, and it shows
-what an "AI service" actually is once the SDK wrapper is removed — an HTTP
-endpoint, a key or token, a content type, and bytes in both directions.
-
-A Speech resource is *separate* from your Foundry resource: its own endpoint, its
-own region, its own key. That is the point made in the session — services are not
-the model, and one credential does not open all of them.
-
-Config:  AZURE_SPEECH_KEY, AZURE_SPEECH_REGION, AZURE_SPEECH_VOICE
-"""
 from __future__ import annotations
 
+import os
+from urllib.parse import urlparse
 import httpx
+import azure.cognitiveservices.speech as speechsdk
+from azure.identity import DefaultAzureCredential
 
 from ..config import settings
 
@@ -23,6 +14,74 @@ TTS_FORMAT = "riff-24khz-16bit-mono-pcm"
 
 class SpeechUnavailable(Exception):
     """Raised with instructions when the Speech resource is not configured."""
+
+
+class SpeechSynthesisError(Exception):
+    """Raised when speech synthesis fails or is canceled."""
+
+
+def _resolve_speech_endpoint() -> str:
+    """Resolves Speech endpoint URL from env, settings, or derives it from AZURE_AI_ENDPOINT for Entra ID."""
+    endpoint_url = os.environ.get("AZURE_SPEECH_ENDPOINT") or getattr(settings, "azure_speech_endpoint", "")
+    if endpoint_url:
+        return endpoint_url
+    
+    # If using identity auth, derive speech endpoint from AZURE_AI_ENDPOINT
+    if getattr(settings, "azure_ai_auth", "") == "identity":
+        ai_endpoint = getattr(settings, "azure_ai_endpoint", "")
+        if ai_endpoint:
+            parsed = urlparse(ai_endpoint)
+            host_parts = parsed.netloc.split(".")
+            if host_parts:
+                return f"https://{host_parts[0]}.cognitiveservices.azure.com/"
+    return ""
+
+
+def synthesize_speech(text: str, voice: str) -> bytes:
+    """Synthesize text to speech using Azure Speech SDK with Microsoft Entra ID authentication."""
+    endpoint_url = _resolve_speech_endpoint()
+    if not endpoint_url:
+        raise ValueError("AZURE_SPEECH_ENDPOINT environment variable is missing or could not be resolved.")
+
+    # 1. Instantiate DefaultAzureCredential from azure.identity
+    credential = DefaultAzureCredential()
+
+    # 2. Fetch access token for Cognitive Services scope
+    token = credential.get_token("https://cognitiveservices.azure.com/.default")
+
+    # 3. Configure SpeechConfig using base endpoint (scheme + netloc) and set authorization token
+    parsed = urlparse(endpoint_url)
+    base_endpoint = f"{parsed.scheme}://{parsed.netloc}"
+    speech_config = speechsdk.SpeechConfig(endpoint=base_endpoint)
+    speech_config.speech_synthesis_voice_name = voice
+
+    # Azure Speech SDK with Entra ID token requires aad#resource_id#token format
+    resource_id = os.environ.get("AZURE_SPEECH_RESOURCE_ID") or getattr(settings, "azure_speech_resource_id", "")
+    if not resource_id:
+        resource_id = "/subscriptions/5487059e-7469-4758-9c9e-6f4196b4ebf7/resourceGroups/ai-academy/providers/Microsoft.CognitiveServices/accounts/ai-academy-foundry"
+
+    if resource_id:
+        speech_config.authorization_token = f"aad#{resource_id}#{token.token}"
+    else:
+        speech_config.authorization_token = "Bearer " + token.token
+
+    # 4. Configure SpeechSynthesizer with audio_config=None to prevent playing to default system speakers
+    synthesizer = speechsdk.SpeechSynthesizer(speech_config=speech_config, audio_config=None)
+
+    # 5. Run speak_text_async(text).get()
+    result = synthesizer.speak_text_async(text).get()
+
+    # 6. Check the result and return bytes or raise exception with cancellation details
+    if result.reason == speechsdk.ResultReason.SynthesizingAudioCompleted:
+        return result.audio_data
+    elif result.reason == speechsdk.ResultReason.Canceled:
+        cancellation_details = speechsdk.SpeechSynthesisCancellationDetails(result)
+        error_msg = f"Speech synthesis canceled: {cancellation_details.reason}"
+        if cancellation_details.reason == speechsdk.CancellationReason.Error:
+            error_msg += f" (Error Code: {cancellation_details.error_code}, Details: {cancellation_details.error_details})"
+        raise SpeechSynthesisError(error_msg)
+    else:
+        raise SpeechSynthesisError(f"Speech synthesis failed with reason: {result.reason}")
 
 
 def _credentials() -> tuple[str, str]:
@@ -51,6 +110,14 @@ def _credentials() -> tuple[str, str]:
 
 def describe() -> dict:
     """What /health reports, without raising when nothing is configured."""
+    endpoint_url = _resolve_speech_endpoint()
+    if endpoint_url:
+        return {
+            "configured": True,
+            "endpoint": endpoint_url,
+            "auth": "Entra ID (Identity)",
+            "voice": settings.azure_speech_voice,
+        }
     try:
         key, region = _credentials()
     except SpeechUnavailable:
@@ -70,14 +137,18 @@ def _require_config() -> None:
 
 
 def synthesize(text: str, voice: str | None = None) -> bytes:
-    """Text -> spoken audio (WAV bytes). The request body is SSML."""
+    """Text -> spoken audio (WAV bytes). Uses Entra ID SDK if endpoint/identity is available, otherwise REST key fallback."""
+    voice_name = voice or settings.azure_speech_voice
+    endpoint_url = _resolve_speech_endpoint()
+    if endpoint_url:
+        return synthesize_speech(text, voice_name)
+
     key, region = _credentials()
-    voice = voice or settings.azure_speech_voice
-    locale = "-".join(voice.split("-")[:2]) if "-" in voice else "en-US"
+    locale = "-".join(voice_name.split("-")[:2]) if "-" in voice_name else "en-US"
 
     ssml = (
         f'<speak version="1.0" xml:lang="{locale}">'
-        f'<voice xml:lang="{locale}" name="{voice}">{_escape(text)}</voice>'
+        f'<voice xml:lang="{locale}" name="{voice_name}">{_escape(text)}</voice>'
         f"</speak>"
     )
     url = f"https://{region}.tts.speech.microsoft.com/cognitiveservices/v1"

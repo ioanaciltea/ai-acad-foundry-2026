@@ -1,8 +1,8 @@
 // Thin wrapper over the backend. Every call returns parsed JSON or throws an Error
 // carrying the API's own `detail` message — so the UI can show the real reason.
 
-async function request(path, { method = 'GET', body, raw = false } = {}) {
-  const options = { method, headers: {} }
+async function request(path, { method = 'GET', body, raw = false, signal } = {}) {
+  const options = { method, headers: {}, signal }
   if (body !== undefined) {
     options.headers['Content-Type'] = 'application/json'
     options.body = JSON.stringify(body)
@@ -29,7 +29,7 @@ export const api = {
   resetCollection: () => request('/collection', { method: 'DELETE' }),
 
   search: (payload) => request('/search', { method: 'POST', body: payload }),
-  ask: (payload) => request('/ask', { method: 'POST', body: payload }),
+  ask: (payload, options = {}) => request('/ask', { method: 'POST', body: payload, ...options }),
 
   agents: () => request('/agents'),
   agent: (name) => request(`/agents/${encodeURIComponent(name)}`),
@@ -40,7 +40,7 @@ export const api = {
   azure: () => request('/azure'),
 
   webFetch: (payload) => request('/tools/web-fetch', { method: 'POST', body: payload }),
-  speak: (payload) => request('/tools/speak', { method: 'POST', body: payload, raw: true }),
+  speak: (payload, options = {}) => request('/tools/speak', { method: 'POST', body: payload, raw: true, ...options }),
   transcribe: async (file) => {
     const form = new FormData()
     form.append('file', file)

@@ -5,9 +5,15 @@ Swagger UI:  /docs        ReDoc: /redoc
 """
 from __future__ import annotations
 
+import os
+from pathlib import Path
+
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
+
+DATA_DIR = Path(__file__).parent.parent / "data"
+CODE_DATA_DIR = Path(__file__).parent.parent.parent / "data"
 
 from . import chunking
 from .agents import foundry_agent, local_agent
@@ -258,8 +264,7 @@ def chunk_only(req: ChunkRequest) -> ChunkResponse:
 # --- ingestion ----------------------------------------------------------------
 @app.post("/ingest", response_model=IngestResponse, tags=["2 · ingestion"])
 def ingest(req: IngestRequest) -> IngestResponse:
-    """Chunk -> embed -> store in Qdrant. The response shows the chunks, the
-    vector dimension, and a peek at the first embedding."""
+    """Chunk -> embed -> store in Qdrant. Also saves the ingested document to ./data."""
     _require_qdrant()
     pieces, p = _do_chunk(req)
     if not pieces:
@@ -271,6 +276,22 @@ def ingest(req: IngestRequest) -> IngestResponse:
     except DimensionMismatch as e:
         raise HTTPException(status_code=409, detail=str(e))
     ids = store.upsert(pieces, vectors, p["strategy"], req.source)
+
+    # Save document copy into code/data and backend/data directories
+    try:
+        CODE_DATA_DIR.mkdir(parents=True, exist_ok=True)
+        DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+        raw_name = req.source or "document.md"
+        filename = os.path.basename(raw_name)
+        if not filename.endswith((".md", ".txt", ".json", ".markdown")):
+            filename = f"{filename}.md"
+
+        (CODE_DATA_DIR / filename).write_text(req.text, encoding="utf-8")
+        (DATA_DIR / filename).write_text(req.text, encoding="utf-8")
+    except Exception as e:
+        print(f"Warning: Could not save document to data directories: {e}")
+
     return IngestResponse(
         strategy=p["strategy"], count=len(pieces), vector_dimension=dim,
         embedding_preview=[round(x, 5) for x in vectors[0][:8]],
@@ -334,8 +355,6 @@ def ask(req: AskRequest) -> AskResponse:
     try:
         persona = load_persona(persona_name)
     except PersonaNotFound as e:
-        # In foundry mode the instructions may live in Azure rather than on disk —
-        # an agent created in the portal has no local file, and should still work.
         if mode_requested != "foundry":
             raise HTTPException(status_code=404, detail=str(e))
         try:
@@ -345,7 +364,6 @@ def ask(req: AskRequest) -> AskResponse:
         if not hosted_only:
             raise HTTPException(status_code=404, detail=str(e))
 
-    # ---- retrieval (unchanged behaviour, now feeding the agent) -------------
     if req.use_rag:
         _require_qdrant()
         if not store.info()["exists"]:
@@ -359,7 +377,6 @@ def ask(req: AskRequest) -> AskResponse:
     chunks = [h.model_dump() for h in retrieved]
     mode = mode_requested
 
-    # ---- run the agent ------------------------------------------------------
     try:
         if hosted_only is not None:
             reply = foundry_agent.run_hosted(hosted_only, req.question, chunks)

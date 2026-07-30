@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api'
-import { ChunkList, Err, Head, Hits, RawJson, Spinner } from '../components'
+import { ChunkList, Err, Head, RawJson, Spinner } from '../components'
 
 const SAMPLE = `Libra Bank issues debit and credit cards to retail customers. A card is blocked automatically after three failed PIN attempts, after the fraud engine flags a suspicious transaction, or at the customer's own request in the mobile application. A blocked card is unblocked in the branch after identity verification, or through the call centre using the phone banking password.
 
@@ -10,31 +10,64 @@ Term deposits can be opened in RON, EUR or USD, with maturities from one month t
 
 export default function Knowledge() {
   const [text, setText] = useState(SAMPLE)
+  const [source, setSource] = useState('sample.md')
   const [strategy, setStrategy] = useState('dynamic')
   const [size, setSize] = useState(400)
   const [overlap, setOverlap] = useState(80)
   const [sentences, setSentences] = useState(3)
   const [threshold, setThreshold] = useState(0.75)
+  const [fileInfo, setFileInfo] = useState(null)
   const [preview, setPreview] = useState(null)
   const [ingested, setIngested] = useState(null)
   const [collection, setCollection] = useState(null)
   const [busy, setBusy] = useState('')
   const [error, setError] = useState(null)
+  const [isDragging, setIsDragging] = useState(false)
 
   const refresh = () => api.collection().then(setCollection).catch(() => setCollection(null))
   useEffect(() => { refresh() }, [])
 
   const payload = () => ({
-    text, strategy,
+    text, strategy, source: source || 'markdown-doc.md',
     chunk_size: Number(size), chunk_overlap: Number(overlap),
     sentences_per_chunk: Number(sentences), semantic_threshold: Number(threshold),
   })
+
+  function handleFileRead(file) {
+    if (!file) return
+    if (!file.name.match(/\.(md|markdown|txt)$/i)) {
+      setError('Te rugăm să încarci un fișier Markdown (.md) sau de tip text (.txt).')
+      return
+    }
+    setError(null)
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      const content = e.target.result
+      setText(content)
+      setSource(file.name)
+      setFileInfo({
+        name: file.name,
+        sizeKb: (file.size / 1024).toFixed(1),
+        chars: content.length,
+        lines: content.split('\n').length
+      })
+    }
+    reader.onerror = () => setError('Eroare la citirea fișierului.')
+    reader.readAsText(file)
+  }
+
+  function handleDrop(e) {
+    e.preventDefault()
+    setIsDragging(false)
+    const file = e.dataTransfer.files?.[0]
+    if (file) handleFileRead(file)
+  }
 
   async function run(kind) {
     setBusy(kind); setError(null)
     try {
       if (kind === 'chunk') { setPreview(await api.chunk(payload())); setIngested(null) }
-      else { const r = await api.ingest({ ...payload(), source: 'console' }); setIngested(r); setPreview(null); refresh() }
+      else { const r = await api.ingest(payload()); setIngested(r); setPreview(null); refresh() }
     } catch (e) { setError(e.message) } finally { setBusy('') }
   }
 
@@ -47,22 +80,78 @@ export default function Knowledge() {
   return (
     <>
       <Head title="Knowledge">
-        Split a document into chunks and store them as vectors. Chunking is the highest-leverage
-        decision in a RAG pipeline — compare the strategies on the same text and watch the
-        boundaries move.
+        Indexează documente și fișiere Markdown (.md) în baza de date vectorială. Conținutul indexat va fi
+        folosit automat ca sursă de referință în răspunsurile cu RAG ale agentului.
       </Head>
 
       <div className="card">
-        <label>Document</label>
-        <textarea value={text} onChange={(e) => setText(e.target.value)} style={{ minHeight: 160 }} />
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '.6rem', flexWrap: 'wrap', gap: '.5rem' }}>
+          <label style={{ margin: 0, fontWeight: 700 }}>Document / Conținut Markdown (.md)</label>
+          <label className="btn btn-outline btn-sm shrink" style={{ textTransform: 'none', letterSpacing: 0, margin: 0, cursor: 'pointer' }}>
+            📄 Încarcă fișier .MD / .TXT
+            <input
+              type="file"
+              accept=".md,.markdown,.txt"
+              onChange={(e) => handleFileRead(e.target.files?.[0])}
+              style={{ display: 'none' }}
+            />
+          </label>
+        </div>
+
+        {fileInfo && (
+          <div style={{ marginBottom: '.6rem', display: 'flex', gap: '.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+            <span className="badge" style={{ background: 'var(--accent-soft)', color: 'var(--accent)' }}>
+              📄 {fileInfo.name} ({fileInfo.sizeKb} KB, {fileInfo.chars} caractere, {fileInfo.lines} linii)
+            </span>
+            <button
+              className="btn btn-outline btn-sm"
+              onClick={() => { setText(SAMPLE); setSource('sample.md'); setFileInfo(null); }}
+              style={{ padding: '.15em .5em', fontSize: '.72rem' }}
+            >
+              Revenire la textul de probă
+            </button>
+          </div>
+        )}
+
+        <div
+          onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+          onDragLeave={() => setIsDragging(false)}
+          onDrop={handleDrop}
+          style={{
+            border: isDragging ? '2px dashed var(--accent)' : '1px solid var(--border)',
+            borderRadius: 'var(--r-sm)',
+            transition: 'all 0.2s ease',
+            position: 'relative'
+          }}
+        >
+          <textarea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            style={{ minHeight: 180, border: 'none', background: 'transparent' }}
+            placeholder="Introduceți sau trageți (drag & drop) un fișier Markdown (.md) aici..."
+          />
+          {isDragging && (
+            <div style={{
+              position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+              background: 'rgba(230,57,70,0.15)', display: 'flex', alignItems: 'center',
+              justifyContent: 'center', fontWeight: 700, color: 'var(--accent)', pointerEvents: 'none'
+            }}>
+              Eliberați fișierul .md pentru a încărca
+            </div>
+          )}
+        </div>
 
         <div className="row" style={{ marginTop: '.8rem' }}>
+          <div>
+            <label>Etichetă sursă (Source Label)</label>
+            <input type="text" value={source} onChange={(e) => setSource(e.target.value)} placeholder="ex. politica_microcredite.md" />
+          </div>
           <div>
             <label>Strategy</label>
             <select value={strategy} onChange={(e) => setStrategy(e.target.value)}>
               <option value="static">static — fixed windows</option>
               <option value="sentence">sentence — N per chunk</option>
-              <option value="dynamic">dynamic — structure aware</option>
+              <option value="dynamic">dynamic — structure aware (optim .md)</option>
               <option value="semantic">semantic — meaning aware</option>
             </select>
           </div>
@@ -80,7 +169,9 @@ export default function Knowledge() {
 
         <div className="row" style={{ marginTop: '.9rem' }}>
           <button className="btn btn-outline shrink" onClick={() => run('chunk')} disabled={!!busy}>Preview chunks</button>
-          <button className="btn btn-primary shrink" onClick={() => run('ingest')} disabled={!!busy}>Chunk + embed + store</button>
+          <button className="btn btn-primary shrink" onClick={() => run('ingest')} disabled={!!busy || !text.trim()}>
+            ⚡ Indexează fișierul Markdown
+          </button>
           <div className="shrink" style={{ alignSelf: 'center' }}>{busy && <Spinner label={busy} />}</div>
         </div>
         <Err error={error} />
@@ -88,7 +179,7 @@ export default function Knowledge() {
 
       {preview && (
         <div className="card">
-          <h3>{preview.count} chunks · strategy “{preview.strategy}” <span className="faint">(nothing stored)</span></h3>
+          <h3>{preview.count} chunks rezultate din “{source}” · strategie “{preview.strategy}” <span className="faint">(neindexat încă)</span></h3>
           <ChunkList chunks={preview.chunks} />
           <RawJson data={preview} />
         </div>
@@ -96,10 +187,10 @@ export default function Knowledge() {
 
       {ingested && (
         <div className="card">
-          <h3>Stored {ingested.count} chunks</h3>
+          <h3>Indexat cu succes: {ingested.count} segmente (chunks) din fișierul Markdown</h3>
           <p className="muted" style={{ marginTop: 0 }}>
-            Embedded with <code>{ingested.embedding_model.model}</code> into{' '}
-            <strong>{ingested.vector_dimension}</strong> dimensions. First eight numbers of chunk 0:
+            Embedded cu <code>{ingested.embedding_model.model}</code> în{' '}
+            <strong>{ingested.vector_dimension}</strong> dimensiuni. Sursă: <code>{source}</code>
           </p>
           <pre className="out">{JSON.stringify(ingested.embedding_preview)}</pre>
           <ChunkList chunks={ingested.chunks} />
@@ -108,7 +199,7 @@ export default function Knowledge() {
       )}
 
       <div className="card">
-        <h3>Collection</h3>
+        <h3>Baza de date vectorială (Collection)</h3>
         {collection ? (
           <div className="row">
             <div><label>name</label><div className="mono">{collection.name}</div></div>

@@ -24,6 +24,7 @@ export default function App() {
   const [health, setHealth] = useState(null)
   const [azure, setAzure] = useState(null)
   const [theme, setTheme] = useState('dark')
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
 
   const loadAgents = useCallback(() => {
     api.agents()
@@ -44,9 +45,34 @@ export default function App() {
   const online = health?.status === 'ok'
 
   return (
-    <div className="app">
+    <div className={`app ${isSidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
+      {isSidebarCollapsed && (
+        <button
+          className="floating-sidebar-toggle"
+          onClick={() => setIsSidebarCollapsed(false)}
+          title="Extinde bara laterală (Expand sidebar)"
+          aria-label="Expand sidebar"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M9 18l6-6-6-6" />
+          </svg>
+        </button>
+      )}
+
       <aside className="side">
-        <p className="brand">Libra Assist<small>console</small></p>
+        <div className="side-head">
+          <p className="brand">Libra Assist<small>console</small></p>
+          <button
+            className="sidebar-toggle-btn"
+            onClick={() => setIsSidebarCollapsed(true)}
+            title="Restrânge bara laterală (Collapse sidebar)"
+            aria-label="Collapse sidebar"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M15 18l-6-6 6-6" />
+            </svg>
+          </button>
+        </div>
         {groups.map((g) => (
           <div key={g}>
             <div className="nav-group">{g}</div>
