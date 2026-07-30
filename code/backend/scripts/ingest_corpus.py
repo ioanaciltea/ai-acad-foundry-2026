@@ -4,7 +4,7 @@ from pathlib import Path
 import urllib.request
 import json
 
-DATA_DIR = Path("../../data")
+DATA_DIR = Path(__file__).resolve().parents[2] / "data"
 API_URL = "http://localhost:7799/ingest"
 
 def parse_frontmatter(file_path):
