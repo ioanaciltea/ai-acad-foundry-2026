@@ -6,6 +6,7 @@ import Knowledge from './views/Knowledge'
 import Search from './views/Search'
 import Status from './views/Status'
 import Tools from './views/Tools'
+import libraLogo from './libra.jpg';
 
 const VIEWS = [
   { id: 'chat', label: 'Chat', group: 'Assistant' },
@@ -61,6 +62,7 @@ export default function App() {
 
       <aside className="side">
         <div className="side-head">
+          <img src={libraLogo} alt="Libra Assist" className="brand-logo" />
           <p className="brand">Libra Assist<small>console</small></p>
           <button
             className="sidebar-toggle-btn"

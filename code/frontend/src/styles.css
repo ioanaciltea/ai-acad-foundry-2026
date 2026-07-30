@@ -26,9 +26,9 @@
 :root,
 :root[data-theme="dark"]{
     --bg:#090909;
-    --surface:#151515;
-    --surface-2:#202020;
-    --surface-inset:#101010;
+    --surface:#242424;
+    --surface-2:#242424;
+    --surface-inset:#242424;
 
     --text:#f4f4f4;
     --text-muted:#b6b6b6;
@@ -70,6 +70,17 @@ body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--
 h1,h2,h3 { letter-spacing: -.02em; line-height: 1.2; margin: 0 0 .4em; }
 code, pre { font-family: var(--font-mono); }
 button, input, textarea, select { font-family: inherit; font-size: inherit; }
+
+.brand-logo {
+  width: 28px;
+  height: 28px;
+  border-radius: 60%;
+  object-fit: cover;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden; 
+}
 
 /* ---- shell ---- */
 .app {

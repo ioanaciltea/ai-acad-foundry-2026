@@ -137,38 +137,49 @@ def _require_config() -> None:
 
 
 def synthesize(text: str, voice: str | None = None) -> bytes:
-    """Text -> spoken audio (WAV bytes). Uses Entra ID SDK if endpoint/identity is available, otherwise REST key fallback."""
+    """Text -> spoken audio (WAV bytes). Ultra-fast REST API key synthesis with Entra ID fallback."""
     voice_name = voice or settings.azure_speech_voice
+    key = settings.azure_speech_key or settings.azure_ai_api_key
+
+    if key:
+        endpoint_url = _resolve_speech_endpoint()
+        region = settings.azure_speech_region or settings.azure_location or "westeurope"
+        locale = "-".join(voice_name.split("-")[:2]) if "-" in voice_name else "ro-RO"
+
+        ssml = (
+            f'<speak version="1.0" xml:lang="{locale}">'
+            f'<voice xml:lang="{locale}" name="{voice_name}">{_escape(text)}</voice>'
+            f"</speak>"
+        )
+
+        urls = []
+        if endpoint_url:
+            urls.append(f"{endpoint_url.rstrip('/')}/cognitiveservices/v1")
+        urls.append(f"https://{region}.tts.speech.microsoft.com/cognitiveservices/v1")
+
+        for url in urls:
+            try:
+                response = httpx.post(
+                    url,
+                    headers={
+                        "Ocp-Apim-Subscription-Key": key,
+                        "Content-Type": "application/ssml+xml",
+                        "X-Microsoft-OutputFormat": TTS_FORMAT,
+                        "User-Agent": "libra-academy",
+                    },
+                    content=ssml.encode("utf-8"),
+                    timeout=10.0,
+                )
+                if response.status_code == 200 and response.content:
+                    return response.content
+            except Exception:
+                continue
+
     endpoint_url = _resolve_speech_endpoint()
     if endpoint_url:
         return synthesize_speech(text, voice_name)
 
-    key, region = _credentials()
-    locale = "-".join(voice_name.split("-")[:2]) if "-" in voice_name else "en-US"
-
-    ssml = (
-        f'<speak version="1.0" xml:lang="{locale}">'
-        f'<voice xml:lang="{locale}" name="{voice_name}">{_escape(text)}</voice>'
-        f"</speak>"
-    )
-    url = f"https://{region}.tts.speech.microsoft.com/cognitiveservices/v1"
-
-    response = httpx.post(
-        url,
-        headers={
-            "Ocp-Apim-Subscription-Key": key,
-            "Content-Type": "application/ssml+xml",
-            "X-Microsoft-OutputFormat": TTS_FORMAT,
-            "User-Agent": "libra-academy",
-        },
-        content=ssml.encode("utf-8"),
-        timeout=30.0,
-    )
-    if response.status_code != 200:
-        raise SpeechUnavailable(
-            f"Speech synthesis failed: HTTP {response.status_code} — {response.text[:300]}"
-        )
-    return response.content
+    raise SpeechUnavailable("Speech credentials or endpoint not available.")
 
 
 def transcribe(audio: bytes, content_type: str = "audio/wav", language: str | None = None) -> dict:

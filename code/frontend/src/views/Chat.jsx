@@ -388,7 +388,7 @@ export default function Chat({ agents, hostedOnly = [], foundry }) {
         </label>
         <label className="check" style={{ margin: 0 }} title="Redă automat răspunsurile prin sinteză vocală (TTS)">
           <input type="checkbox" checked={autoSpeak} onChange={(e) => setAutoSpeak(e.target.checked)} />
-          🔊 TTS Auto-read
+          Auto-read
         </label>
         <select value={mode} onChange={(e) => setMode(e.target.value)} style={{ minWidth: '9rem' }}
                 title="Where the loop executes">
@@ -442,7 +442,7 @@ export default function Chat({ agents, hostedOnly = [], foundry }) {
                   onClick={() => playAudioResponse(d.answer)}
                   title="Play Audio"
                 >
-                  🔊 Play Audio
+                 ▶ Play Audio
                 </button>
                 <button
                   className="badge"
