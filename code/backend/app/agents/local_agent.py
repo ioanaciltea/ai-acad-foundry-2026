@@ -50,9 +50,18 @@ def run(
     question: str,
     chunks: list[dict] | None = None,
     temperature: float | None = None,
+    kids_mode: bool = False,
 ) -> AgentReply:
     chunks = chunks or []
     system = persona.system_prompt(grounded=bool(chunks))
+    if kids_mode:
+        system += (
+            "\n\nIMPORTANT INSTRUCTION:\n"
+            "The user is a child or teenager. Adopt the persona of a friendly financial "
+            "education expert. Use a friendly, encouraging, and simple tone. Focus on "
+            "practical scenarios, goal-setting for pocket money, and smart savings habits. "
+            "Avoid complex banking jargon."
+        )
     user = build_user_prompt(question, chunks)
 
     # precedence: explicit request value > persona file > .env default

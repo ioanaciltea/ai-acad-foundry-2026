@@ -113,6 +113,10 @@ class AskRequest(BaseModel):
     agent_mode: Optional[Literal["local", "foundry"]] = Field(
         None, description="local = the loop runs here; foundry = the hosted Agent Service"
     )
+    kids_mode: bool = Field(
+        False,
+        description="Inject a system prompt modification for teaching financial education to kids.",
+    )
     fact_check: bool = Field(
         False,
         description="After answering, verify the answer against the open web and attach a "

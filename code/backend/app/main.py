@@ -379,11 +379,11 @@ def ask(req: AskRequest) -> AskResponse:
 
     try:
         if hosted_only is not None:
-            reply = foundry_agent.run_hosted(hosted_only, req.question, chunks)
+            reply = foundry_agent.run_hosted(hosted_only, req.question, chunks, kids_mode=req.kids_mode)
         elif mode == "foundry":
-            reply = foundry_agent.run(persona, req.question, chunks)
+            reply = foundry_agent.run(persona, req.question, chunks, kids_mode=req.kids_mode)
         else:
-            reply = local_agent.run(persona, req.question, chunks, temperature=req.temperature)
+            reply = local_agent.run(persona, req.question, chunks, temperature=req.temperature, kids_mode=req.kids_mode)
     except foundry_agent.FoundryUnavailable as e:
         raise HTTPException(status_code=503, detail=str(e))
     except Exception as e:

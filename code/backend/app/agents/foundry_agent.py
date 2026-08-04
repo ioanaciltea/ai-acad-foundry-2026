@@ -252,6 +252,7 @@ def run(
     question: str,
     chunks: list[dict] | None = None,
     agent_id: str | None = None,
+    kids_mode: bool = False,
 ) -> AgentReply:
     """Invoke the hosted agent for this persona.
 
@@ -267,16 +268,16 @@ def run(
             f"Deploy it first — POST /agents/{persona.name}/deploy, or "
             f"`python scripts/deploy_agent.py {persona.name}`."
         )
-    return _run_thread(agent_id, persona.name, question, chunks or [])
+    return _run_thread(agent_id, persona.name, question, chunks or [], kids_mode)
 
 
-def run_hosted(agent: dict, question: str, chunks: list[dict] | None = None) -> AgentReply:
+def run_hosted(agent: dict, question: str, chunks: list[dict] | None = None, kids_mode: bool = False) -> AgentReply:
     """Invoke a hosted agent that has no local persona file — its instructions
     live in Foundry, so there is nothing to compose on our side."""
-    return _run_thread(agent["agent_id"], agent["name"], question, chunks or [])
+    return _run_thread(agent["agent_id"], agent["name"], question, chunks or [], kids_mode)
 
 
-def _run_thread(agent_id: str, persona_name: str, question: str, chunks: list[dict]) -> AgentReply:
+def _run_thread(agent_id: str, persona_name: str, question: str, chunks: list[dict], kids_mode: bool = False) -> AgentReply:
     """The Agent Service protocol, in four calls."""
     user = build_user_prompt(question, chunks)
 
@@ -284,8 +285,17 @@ def _run_thread(agent_id: str, persona_name: str, question: str, chunks: list[di
     thread_id = thread["id"]
     _call("POST", f"threads/{thread_id}/messages",
           {"role": "user", "content": user})                                 # 2 ask
-    run_obj = _call("POST", f"threads/{thread_id}/runs",
-                    {"assistant_id": agent_id})                              # 3 execute
+          
+    run_payload = {"assistant_id": agent_id}
+    if kids_mode:
+        run_payload["additional_instructions"] = (
+            "IMPORTANT INSTRUCTION:\n"
+            "The user is a child or teenager. Adopt the persona of a friendly financial "
+            "education expert. Use a friendly, encouraging, and simple tone. Focus on "
+            "practical scenarios, goal-setting for pocket money, and smart savings habits. "
+            "Avoid complex banking jargon."
+        )
+    run_obj = _call("POST", f"threads/{thread_id}/runs", run_payload)        # 3 execute
 
     deadline = time.time() + 180
     while run_obj.get("status") in ("queued", "in_progress", "requires_action"):

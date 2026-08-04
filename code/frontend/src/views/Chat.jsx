@@ -11,21 +11,31 @@ function cleanDuplicatePhrases(text) {
   return cleaned
 }
 
-export default function Chat({ agents, hostedOnly = [], foundry }) {
+export default function Chat({
+  agents,
+  kidsMode = false,
+  hostedOnly = [],
+  foundry,
+  useRag = true,
+  setUseRag = () => {},
+  factCheck = false,
+  setFactCheck = () => {},
+  autoSpeak = true,
+  setAutoSpeak = () => {},
+  topK = 3,
+  setTopK = () => {},
+  clearTrigger
+}) {
   const [messages, setMessages] = useState([])
   const [question, setQuestion] = useState('')
   const [agent, setAgent] = useState('default')
-  const [useRag, setUseRag] = useState(true)
-  const [factCheck, setFactCheck] = useState(false)
   const [mode, setMode] = useState('local')
-  const [topK, setTopK] = useState(3)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
 
   // Voice interaction state
   const [isListening, setIsListening] = useState(false)
   const [voiceStatus, setVoiceStatus] = useState('')
-  const [autoSpeak, setAutoSpeak] = useState(true)
   const recognitionRef = useRef(null)
   const mediaRecorderRef = useRef(null)
   const audioChunksRef = useRef([])
@@ -310,6 +320,12 @@ export default function Chat({ agents, hostedOnly = [], foundry }) {
     setBusy(false)
   }, [stopAudioAndRecording])
 
+  useEffect(() => {
+    if (clearTrigger) {
+      handleClear()
+    }
+  }, [clearTrigger, handleClear])
+
   async function send() {
     const text = question.trim()
     if (!text || busy) return
@@ -324,7 +340,7 @@ export default function Chat({ agents, hostedOnly = [], foundry }) {
     setMessages((m) => [...m, { role: 'user', text }])
     try {
       const data = await api.ask(
-        { question: text, use_rag: useRag, top_k: Number(topK), agent, agent_mode: mode, fact_check: factCheck },
+        { question: text, use_rag: useRag, top_k: Number(topK), agent, agent_mode: mode, fact_check: factCheck, kids_mode: kidsMode },
         { signal: controller.signal }
       )
       if (controller.signal.aborted) return
@@ -377,19 +393,6 @@ export default function Chat({ agents, hostedOnly = [], foundry }) {
           )}
         </select>
         {current && <RunsOnBadge runsOn={current.runs_on} reason={foundry?.reason} />}
-        <label className="check" style={{ margin: 0 }} title="Retrieve from your documents and ground the answer">
-          <input type="checkbox" checked={useRag} onChange={(e) => setUseRag(e.target.checked)} />
-          use RAG
-        </label>
-        <label className="check" style={{ margin: 0 }}
-               title="After answering, verify the answer against the open web and attach a verdict">
-          <input type="checkbox" checked={factCheck} onChange={(e) => setFactCheck(e.target.checked)} />
-          fact-check
-        </label>
-        <label className="check" style={{ margin: 0 }} title="Redă automat răspunsurile prin sinteză vocală (TTS)">
-          <input type="checkbox" checked={autoSpeak} onChange={(e) => setAutoSpeak(e.target.checked)} />
-          Auto-read
-        </label>
         <select value={mode} onChange={(e) => setMode(e.target.value)} style={{ minWidth: '9rem' }}
                 title="Where the loop executes">
           <option value="local" disabled={localImpossible}
@@ -401,15 +404,13 @@ export default function Chat({ agents, hostedOnly = [], foundry }) {
                           : foundryBlocked ? ' — not deployed' : ''}
           </option>
         </select>
-        <input type="number" min="1" max="10" value={topK} onChange={(e) => setTopK(e.target.value)}
-               style={{ width: '4.5rem', flex: '0 0 auto' }} title="Passages to retrieve" />
         {foundryReachable === false && (
           <span className="badge muted" title={foundryWhy}>
             hosted agents off — key auth
           </span>
         )}
-        <button className="btn btn-outline btn-sm" onClick={handleClear} title="Clear conversation and stop TTS audio">clear</button>
         {current && <span className="badge muted" title={current.description}>temp {current.temperature ?? '—'}</span>}
+        {kidsMode && <span className="badge" style={{ background: 'var(--c-teal)', color: 'white', border: 'none' }} title="Mod Educație Financiară Activat">Kids Mode ON</span>}
       </div>
 
       <div className="msgs">
@@ -438,19 +439,21 @@ export default function Chat({ agents, hostedOnly = [], foundry }) {
                 {d.usage && <span className="badge muted">{d.usage.prompt_tokens}↑ {d.usage.completion_tokens}↓ tokens</span>}
                 <button
                   className="badge"
-                  style={{ background: 'var(--surface-2)', color: 'var(--accent)', cursor: 'pointer', border: 0 }}
+                  style={{ background: 'var(--surface-2)', color: 'var(--accent)', cursor: 'pointer', border: 0, gap: '.3em' }}
                   onClick={() => playAudioResponse(d.answer)}
                   title="Play Audio"
                 >
-                 ▶ Play Audio
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                  Play Audio
                 </button>
                 <button
                   className="badge"
-                  style={{ background: 'var(--surface-2)', color: '#ff5264', cursor: 'pointer', border: 0 }}
+                  style={{ background: 'var(--surface-2)', color: '#ff5264', cursor: 'pointer', border: 0, gap: '.3em' }}
                   onClick={stopAudioAndRecording}
                   title="Stop Audio and Recording"
                 >
-                  ⏹ Stop Audio
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>
+                  Stop Audio
                 </button>
               </div>
               {d.fact_check && (
