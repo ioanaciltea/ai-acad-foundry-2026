@@ -37,6 +37,14 @@ The corpus contains 15 documents (`.md`), each with a header (title, product, au
 13. `business-cards.md` - cards for corporate clients (Business, Business Gold).
 14. `unoffered-products.md` - explicit list of products Libra Bank does NOT offer (student loans, crypto, unit-linked).
 15. `current-account-onboarding.md` - current account opening procedure, online and at branches.
+16. `savings-accounts-interest-2026.md` - interest rates and terms for savings accounts & term deposits (2026).
+17. `international-sepa-transfers.md` - SEPA and non-SEPA/SWIFT international wire transfer rules & fees.
+18. `mobile-banking-app-faq.md` - mobile app features, biometric authentication, and pin/device recovery.
+19. `overdraft-facility-terms.md` - revolving overdraft limit, eligibility, and interest rates.
+20. `chargeback-dispute-procedure.md` - merchant transaction dispute grounds, evidence, and 5-step process.
+21. `cashback-loyalty-rewards-2026.md` - cashback loyalty reward tiers, merchant categories, and monthly caps.
+22. `phishing-security-guidelines.md` - anti-phishing rules, security verification, and emergency contact numbers.
+23. `sme-business-lending-terms.md` - SME working capital credit line eligibility, interest (ROBOR 3M+4.5%), and docs.
 
 ## Integration Notes
 
